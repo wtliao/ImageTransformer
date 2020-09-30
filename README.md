@@ -2,6 +2,8 @@
 
 This repository includes the implementation for [Image Captioning through Image Transformer](https://arxiv.org/abs/2004.14231) (to appear in ACCV 2020).
 
+This repo is not completely.
+
 ## Requirements
 
 - Python 3.6
@@ -11,6 +13,10 @@ This repository includes the implementation for [Image Captioning through Image 
 - coco-caption (already been added as a submodule)
 - tensorboardX
 
+## TODO
+- [ ] remove all unnecessary files
+- [ ] add link to downlown our pretrained model
+- [ ] clean code including comments
 
 ## Training ImageTransformer
 
@@ -41,7 +47,6 @@ $ CUDA_VISIBLE_DEVICES=0 python eval.py --model log/log_aoanet_rl/model.pth --in
 ### Performance
 You will get the scores close to below after training under xe loss for 25 epochs:
 
-```
 
 
 ## Reference
