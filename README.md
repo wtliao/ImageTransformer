@@ -14,6 +14,7 @@ This repo is not completely.
 - tensorboardX
 
 ## TODO
+- [ ] instruction to prepare dataset
 - [ ] remove all unnecessary files
 - [ ] add link to downlown our pretrained model
 - [ ] clean code including comments
