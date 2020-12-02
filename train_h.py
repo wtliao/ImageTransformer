@@ -14,7 +14,7 @@ from six.moves import cPickle
 import traceback
 import opts as opts
 import models
-from dataloader1 import *
+from dataloader import *
 import skimage.io
 import eval_utils_h as eval_utils
 import misc.utils2 as utils

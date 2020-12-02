@@ -14,6 +14,8 @@ import torch.utils.data as data
 
 import multiprocessing
 import six
+import glob
+import ipdb
 
 
 class HybridLoader:
@@ -98,8 +100,9 @@ class DataLoader(data.Dataset):
             print('vocab size is ', self.vocab_size)
 
         # open the hdf5 file
-        print('DataLoader loading h5 file: ', opt.input_fc_dir, opt.input_att_dir, opt.input_box_dir, opt.input_label_h5)
-        if self.opt.input_label_h5 != 'none':
+        print('DataLoader loading h5 file: ', opt.input_fc_dir, opt.input_att_dir, opt.input_box_dir,
+              opt.input_label_h5, opt.input_flag_dir)
+        if self.opt.input_label_h5 is not None:
             self.h5_label_file = h5py.File(self.opt.input_label_h5, 'r', driver='core')
             # load in the sequence data
             seq_size = self.h5_label_file['labels'].shape
@@ -115,32 +118,52 @@ class DataLoader(data.Dataset):
         self.fc_loader = HybridLoader(self.opt.input_fc_dir, '.npy')
         self.att_loader = HybridLoader(self.opt.input_att_dir, '.npz')
         self.box_loader = HybridLoader(self.opt.input_box_dir, '.npy')
+        ####flag loader
+        if os.path.exists(self.opt.input_flag_dir):
+            self.flag_loader = HybridLoader(self.opt.input_flag_dir, '.npy')
+        else:
+            print("No flag used!")
+            self.flag_loader = None
 
         self.num_images = len(self.info['images'])  # self.label_start_ix.shape[0]
         print('read %d image features' % (self.num_images))
 
-        # separate out indexes for each of the provided splits
-        self.split_ix = {'train': [], 'val': [], 'test': []}
-        for ix in range(len(self.info['images'])):
-            img = self.info['images'][ix]
-            if not 'split' in img:
-                self.split_ix['train'].append(ix)
-                self.split_ix['val'].append(ix)
-                self.split_ix['test'].append(ix)
-            elif img['split'] == 'train':
-                self.split_ix['train'].append(ix)
-            elif img['split'] == 'val':
-                self.split_ix['val'].append(ix)
-            elif img['split'] == 'test':
-                self.split_ix['test'].append(ix)
-            elif opt.train_only == 0:  # restval
-                self.split_ix['train'].append(ix)
+        if self.opt.test_online:
+            imgs = glob.glob(self.opt.input_box_dir + '/*.npy')
+            self.split_ix = {'online_test': list(range(len(imgs)))}
+            self.info['images'] = []
+            for ix in imgs:
+                self.info['images'].append({'id': int(os.path.basename(ix).split('.')[0])})
 
-        print('assigned %d images to split train' % len(self.split_ix['train']))
-        print('assigned %d images to split val' % len(self.split_ix['val']))
-        print('assigned %d images to split test' % len(self.split_ix['test']))
+            self.iterators = {'online_test': 0}
+            print('assigned %d images to online test' % len(self.split_ix['online_test']))
+        else:
+            # separate out indexes for each of the provided splits
+            self.split_ix = {'train': [], 'val': [], 'test': []}
+            for ix in range(len(self.info['images'])):
+                img = self.info['images'][ix]
+                if 'split' not in img:
+                    self.split_ix['train'].append(ix)
+                    self.split_ix['val'].append(ix)
+                    self.split_ix['test'].append(ix)
+                elif img['split'] == 'train':
+                    self.split_ix['train'].append(ix)
+                elif img['split'] == 'val':
+                    if getattr(self.opt, 'use_val', 0):  # add the val set to train the model
+                        self.split_ix['train'].append(ix)
+                    self.split_ix['val'].append(ix)    
+                elif img['split'] == 'test':                   
+                    if getattr(self.opt, 'use_test', 0):  # add the test set to train the model
+                        self.split_ix['train'].append(ix)
+                    self.split_ix['test'].append(ix)
+                elif opt.train_only == 0:  # use restval fro training
+                    self.split_ix['train'].append(ix)
+            
+            print('assigned %d images to split train' % len(self.split_ix['train']))
+            print('assigned %d images to split val' % len(self.split_ix['val']))
+            print('assigned %d images to split test' % len(self.split_ix['test']))
 
-        self.iterators = {'train': 0, 'val': 0, 'test': 0} # recorde the number of having read data index
+            self.iterators = {'train': 0, 'val': 0, 'test': 0}
 
         self._prefetch_process = {}  # The three prefetch process
         for split in self.iterators.keys():
@@ -151,6 +174,7 @@ class DataLoader(data.Dataset):
             print('Terminating BlobFetcher')
             for split in self.iterators.keys():
                 del self._prefetch_process[split]
+
         import atexit
         atexit.register(cleanup)
 
@@ -179,6 +203,7 @@ class DataLoader(data.Dataset):
 
         fc_batch = []  # np.ndarray((batch_size * seq_per_img, self.opt.fc_feat_size), dtype = 'float32')
         att_batch = []  # np.ndarray((batch_size * seq_per_img, 14, 14, self.opt.att_feat_size), dtype = 'float32')
+        flag_batch = []
         label_batch = []  # np.zeros([batch_size * seq_per_img, self.seq_length + 2], dtype = 'int')
 
         wrapped = False
@@ -188,18 +213,20 @@ class DataLoader(data.Dataset):
 
         for i in range(batch_size):
             # fetch image
-            tmp_fc, tmp_att, tmp_seq, \
+            tmp_fc, tmp_att, tmp_flag, tmp_seq, \
                 ix, tmp_wrapped = self._prefetch_process[split].get()
             if tmp_wrapped:
                 wrapped = True
 
             fc_batch.append(tmp_fc)
             att_batch.append(tmp_att)
+            flag_batch.append(tmp_flag)
 
-            tmp_label = np.zeros([seq_per_img, self.seq_length + 2], dtype='int')
-            if hasattr(self, 'h5_label_file'):
-                tmp_label[:, 1: self.seq_length + 1] = tmp_seq
-            label_batch.append(tmp_label)
+            if not self.opt.test_online:
+                tmp_label = np.zeros([seq_per_img, self.seq_length + 2], dtype='int')
+                if hasattr(self, 'h5_label_file'):
+                    tmp_label[:, 1: self.seq_length + 1] = tmp_seq
+                label_batch.append(tmp_label)
 
             # Used for reward evaluation
             if hasattr(self, 'h5_label_file'):
@@ -217,40 +244,54 @@ class DataLoader(data.Dataset):
         # #sort by att_feat length
         # fc_batch, att_batch, label_batch, gts, infos = \
         #     zip(*sorted(zip(fc_batch, att_batch, np.vsplit(label_batch, batch_size), gts, infos), key=lambda x: len(x[1]), reverse=True))
-        fc_batch, att_batch, label_batch, gts, infos = \
-            zip(*sorted(zip(fc_batch, att_batch, label_batch, gts, infos), key=lambda x: 0, reverse=True))
+        if self.opt.test_online:
+            fc_batch, att_batch, flag_batch, infos = zip(*sorted(zip(fc_batch, att_batch, flag_batch, infos), key=lambda x: 0, reverse=True))
+        else:
+            fc_batch, att_batch, flag_batch, label_batch, gts, infos = \
+                zip(*sorted(zip(fc_batch, att_batch, flag_batch, label_batch, gts, infos), key=lambda x: 0, reverse=True))
         data = {}
         data['fc_feats'] = np.stack(sum([[_] * seq_per_img for _ in fc_batch], []))
         # merge att_feats
         max_att_len = max([_.shape[0] for _ in att_batch])
-        data['att_feats'] = np.zeros([len(att_batch) * seq_per_img, max_att_len, att_batch[0].shape[1]], dtype='float32')
+        data['att_feats'] = np.zeros([len(att_batch) * seq_per_img, max_att_len, att_batch[0].shape[1]],
+                                     dtype='float32')
+        data['flag_feats'] = np.zeros([len(flag_batch) * seq_per_img, max_att_len, max_att_len])
         for i in range(len(att_batch)):
             data['att_feats'][i * seq_per_img:(i + 1) * seq_per_img, :att_batch[i].shape[0]] = att_batch[i]
+        for i in range(len(att_batch)):
+            data['flag_feats'][i * seq_per_img:(i + 1) * seq_per_img, :flag_batch[i].shape[0],
+            :flag_batch[i].shape[0]] = flag_batch[i]
         data['att_masks'] = np.zeros(data['att_feats'].shape[:2], dtype='float32')
         for i in range(len(att_batch)):
             data['att_masks'][i * seq_per_img:(i + 1) * seq_per_img, :att_batch[i].shape[0]] = 1
+        # for i in range(len(att_batch)):
+        #    data['att_masks'][i*seq_per_img:(i+1)*seq_per_img, :att_batch[i].shape[0]] = 1
         # set att_masks to None if attention features have same length
         if data['att_masks'].sum() == data['att_masks'].size:
             data['att_masks'] = None
 
-        data['labels'] = np.vstack(label_batch)
-        # generate mask
-        nonzeros = np.array(list(map(lambda x: (x != 0).sum() + 2, data['labels'])))
-        mask_batch = np.zeros([data['labels'].shape[0], self.seq_length + 2], dtype='float32')
-        for ix, row in enumerate(mask_batch):
-            row[:nonzeros[ix]] = 1
-        data['masks'] = mask_batch
+        if not self.opt.test_online:
+            data['labels'] = np.vstack(label_batch)
+            # generate mask
+            nonzeros = np.array(list(map(lambda x: (x != 0).sum() + 2, data['labels'])))
+            mask_batch = np.zeros([data['labels'].shape[0], self.seq_length + 2], dtype='float32')
+            for ix, row in enumerate(mask_batch):
+                row[:nonzeros[ix]] = 1
+            data['masks'] = mask_batch
+        else:
+            data['labels'] = None
+            data['masks'] = None
 
         data['gts'] = gts  # all ground truth captions of each images
         data['bounds'] = {'it_pos_now': self.iterators[split], 'it_max': len(self.split_ix[split]), 'wrapped': wrapped}
         data['infos'] = infos
 
-        data = {k: torch.from_numpy(v) if type(v) is np.ndarray else v for k, v in data.items()}  # Turn all ndarray to torch tensor
+        data = {k: torch.from_numpy(v) if type(v) is np.ndarray else v for k, v in
+                data.items()}  # Turn all ndarray to torch tensor
 
         return data
 
-    # It's not coherent to make DataLoader a subclass of Dataset, but essentially,
-    # we only need to implement the following to functions,
+    # It's not coherent to make DataLoader a subclass of Dataset, but essentially, we only need to implement the following to functions,
     # so that the torch.utils.data.DataLoader can load the data according the index.
     # However, it's minimum change to switch to pytorch data loading.
     def __getitem__(self, index):
@@ -268,7 +309,8 @@ class DataLoader(data.Dataset):
                 # devided by image width and height
                 x1, y1, x2, y2 = np.hsplit(box_feat, 4)
                 h, w = self.info['images'][ix]['height'], self.info['images'][ix]['width']
-                box_feat = np.hstack((x1 / w, y1 / h, x2 / w, y2 / h, (x2 - x1) * (y2 - y1) / (w * h)))  # question? x2-x1+1??
+                box_feat = np.hstack(
+                    (x1 / w, y1 / h, x2 / w, y2 / h, (x2 - x1) * (y2 - y1) / (w * h)))  # question? x2-x1+1??
                 if self.norm_box_feat:
                     box_feat = box_feat / np.linalg.norm(box_feat, 2, 1, keepdims=True)
                 att_feat = np.hstack([att_feat, box_feat])
@@ -276,6 +318,11 @@ class DataLoader(data.Dataset):
                 att_feat = np.stack(sorted(att_feat, key=lambda x: x[-1], reverse=True))
         else:
             att_feat = np.zeros((1, 1, 1), dtype='float32')
+        if self.flag_loader is not None:
+            flag_feat = self.flag_loader.get(str(self.info['images'][ix]['id']))
+        else:
+            flag_feat = None
+        # print(flag_feat.shape)
         if self.use_fc:
             fc_feat = self.fc_loader.get(str(self.info['images'][ix]['id']))
         else:
@@ -284,9 +331,8 @@ class DataLoader(data.Dataset):
             seq = self.get_captions(ix, self.seq_per_img)
         else:
             seq = None
-        return (fc_feat,
-                att_feat, seq,
-                ix)
+
+        return fc_feat, att_feat, flag_feat, seq, ix
 
     def __len__(self):
         return len(self.info['images'])
