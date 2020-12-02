@@ -3,7 +3,7 @@ import argparse
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    # Use all train val data to fine tune model for challenge, we dont use it. Just set it for convenient
+    # Use all train val data to fine tune model for challenge, we don't use it. Just set it for convenient
     parser.add_argument('--use_val', type=int, default=0,
                         help='add the val set for training if True')
     parser.add_argument('--use_test', type=int, default=0,
@@ -66,7 +66,7 @@ def parse_opt():
 
     parser.add_argument('--use_bn', type=int, default=0,
                         help='If 1, then do batch_normalization first in att_embed, if 2 then do bn both in the beginning and the end of att_embed')
-    parser.add_argument('--write_summary', type=int, default=1,
+    parser.add_argument('--write_summary', type=bool, default=True,
                         help='if write the training process using tensorbordx')
 
     # AoA settings

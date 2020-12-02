@@ -17,7 +17,7 @@ import models
 from dataloader1 import *
 import skimage.io
 import eval_utils_h as eval_utils
-import misc.utils as utils
+import misc.utils2 as utils
 from misc.rewards import init_scorer, get_self_critical_reward
 from misc.loss_wrapper1 import LossWrapper1
 from tqdm import tqdm
@@ -29,7 +29,10 @@ except ImportError:
     print("tensorboardX is not installed")
     tb = None
 
-write_summary = True
+# set the maximum number of CPU kernel
+torch.set_num_threads(10)
+
+# write_summary = True
 eval_ = True
 
 
@@ -53,22 +56,45 @@ def train(opt):
     print("#GPU={}".format(torch.cuda.device_count()))
     print("Caption model {}".format(opt.caption_model))
     print("refine aoa {}".format(opt.refine_aoa))
+    print("Number of aoa module {}".format(opt.aoa_num))
     print("Self Critic After  {}".format(opt.self_critical_after))
+    print("learning_rate_decay_every {}".format(opt.learning_rate_decay_every))
+    
+    # use more data to fine tune the model for better challeng results. We dont use it
+    if opt.use_val or opt.use_test:  
+        print("+++++++++++It is a refining training+++++++++++++++")
+        print("===========Val is {} used for training ===========".format('' if opt.use_val else 'not'))
+        print("===========Test is {} used for training ===========".format('' if opt.use_test else 'not'))
     print("=====================================================")
-    print("this training model is to fix the import model ATTModel as ATTModel1 in TransformerModel1")
+    
+    # set more detail name of checkpoint paths
+    checkpoint_path_suffix = "_bs{}".format(opt.batch_size)
+    if opt.use_warmup:
+        checkpoint_path_suffix += "_warmup"
+    if torch.cuda.device_count() > 1:
+        checkpoint_path_suffix += "_gpu{}".format(torch.cuda.device_count())
+
+    if opt.checkpoint_path.endswith('_rl'):
+        opt.checkpoint_path = opt.checkpoint_path[:-3] + checkpoint_path_suffix + '_rl'
+    else:
+        opt.checkpoint_path += checkpoint_path_suffix
+    print("Save model to {}".format(opt.checkpoint_path))
+
     # Deal with feature things before anything
     opt.use_fc, opt.use_att = utils.if_use_feat(opt.caption_model)
     if opt.use_box:
         opt.att_feat_size = opt.att_feat_size + 5
 
     acc_steps = getattr(opt, 'acc_steps', 1)
+    name_append = opt.name_append
+    if len(name_append) > 0 and name_append[0] != '-':
+        name_append = '_' + name_append
 
     loader = DataLoader(opt)
 
     opt.vocab_size = loader.vocab_size
     opt.seq_length = loader.seq_length
-    opt.write_summary = write_summary
-    opt.losses_log_every = len(loader.split_ix['train'])//opt.batch_size
+    opt.losses_log_every = len(loader.split_ix['train']) // opt.batch_size
     print("Evaluate on each {} iterations".format(opt.losses_log_every))
     if opt.write_summary:
         print("write summary to {}".format(opt.checkpoint_path))
@@ -77,21 +103,22 @@ def train(opt):
     infos = {}
     histories = {}
 
+    # load  checkpoint
     if opt.start_from is not None:
         # open old infos and check if models are compatible
-        # infos_path = os.path.join(opt.start_from, 'infos_' + opt.id + opt.name_append + '.pkl')
-        infos_path = os.path.join(opt.start_from, 'infos' + opt.name_append + '.pkl')
+        infos_path = os.path.join(opt.start_from, 'infos' + name_append + '.pkl')
         print("Load model information {}".format(infos_path))
         with open(infos_path, 'rb') as f:
             infos = utils.pickle_load(f)
             saved_model_opt = infos['opt']
             need_be_same = ["caption_model", "rnn_type", "rnn_size", "num_layers"]
-            # TODO: comment temperally
+            
+            # this sanity check may not work well, and comment it if necessary
             for checkme in need_be_same:
                 assert vars(saved_model_opt)[checkme] == vars(opt)[checkme], \
                     "Command line argument and saved model disagree on '%s' " % checkme
 
-        histories_path = os.path.join(opt.start_from, 'histories' + opt.name_append + '.pkl')
+        histories_path = os.path.join(opt.start_from, 'histories' + name_append + '.pkl')
         if os.path.isfile(histories_path):
             with open(histories_path, 'rb') as f:
                 histories = utils.pickle_load(f)
@@ -104,9 +131,8 @@ def train(opt):
         infos['iterators'] = loader.iterators
         infos['split_ix'] = loader.split_ix
         infos['vocab'] = loader.get_vocab()
+    
     infos['opt'] = opt
-    # infos['iter'] = 0
-    # infos['epoch'] = 0
     iteration = infos.get('iter', 0)
     epoch = infos.get('epoch', 0)
     print("==================start from {} iterations -- {} epoch".format(iteration, epoch))
@@ -114,24 +140,31 @@ def train(opt):
     loss_history = histories.get('loss_history', {})
     lr_history = histories.get('lr_history', {})
     ss_prob_history = histories.get('ss_prob_history', {})
-    # pdb.set_trace()
+
     loader.iterators = infos.get('iterators', loader.iterators)
     start_Img_idx = loader.iterators['train']
     loader.split_ix = infos.get('split_ix', loader.split_ix)
+
     if opt.load_best_score == 1:
         best_val_score = infos.get('best_val_score', None)
+        best_epoch = infos.get('best_epoch', None)
+        best_cider = infos.get('best_val_score', 0)
+        print("========best history val cider score: {} in epoch {}=======".format(best_val_score, best_epoch))
 
+    #  sanity check for the saved model name has a correct index
+    if opt.name_append.isdigit() and int(opt.name_append)<100:
+        assert int(opt.name_append) - epoch == 1, "dismatch in the model index and the real epoch number"
+        epoch += 1
     opt.vocab = loader.get_vocab()
     model = models.setup(opt).cuda()
     del opt.vocab
-    # dp_model = torch.nn.DataParallel(model)
-    # lw_model = LossWrapper1(model, opt)  # wrap loss into model
-    # dp_lw_model = torch.nn.DataParallel(lw_model)
-
-    # modify to one GPU model
-    dp_model = model  # torch.nn.DataParallel(model)
-    lw_model = LossWrapper1(model, opt)
-    dp_lw_model = lw_model  # torch.nn.DataParallel(lw_model)
+    
+    if torch.cuda.device_count()>1:
+        dp_model = torch.nn.DataParallel(model)
+    else:
+        dp_model = model
+    lw_model = LossWrapper1(model, opt)  # wrap loss into model
+    dp_lw_model = torch.nn.DataParallel(lw_model)
 
     epoch_done = True
     # Assure in training mode
@@ -148,7 +181,7 @@ def train(opt):
         optimizer = utils.build_optimizer(model.parameters(), opt)
     # Load the optimizer
     if vars(opt).get('start_from', None) is not None:
-        optimizer_path = os.path.join(opt.start_from, 'optimizer' + opt.name_append + '.pth')
+        optimizer_path = os.path.join(opt.start_from, 'optimizer' + name_append + '.pth')
         if os.path.isfile(optimizer_path):
             print("Loading optimizer............")
             optimizer.load_state_dict(torch.load(optimizer_path))
@@ -177,19 +210,18 @@ def train(opt):
                 utils.pickle_dump(histories, f)
                 print("Save training historyes to {}".format(
                     os.path.join(opt.checkpoint_path, 'histories' + '%s.pkl' % (append))))
-
     try:
         while True:
-            # pdb.set_trace()
             if epoch_done:
                 if not opt.noamopt and not opt.reduce_on_plateau:
                     # Assign the learning rate
                     if epoch > opt.learning_rate_decay_start and opt.learning_rate_decay_start >= 0:
                         frac = (epoch - opt.learning_rate_decay_start) // opt.learning_rate_decay_every
                         decay_factor = opt.learning_rate_decay_rate ** frac
-                        opt.current_lr = opt.learning_rate  # NOTE: enlarge learning rate
+                        opt.current_lr = opt.learning_rate * decay_factor * opt.refine_lr_decay
                     else:
                         opt.current_lr = opt.learning_rate
+                    infos['current_lr'] = opt.current_lr
                     print("Current Learning Rate is: {}".format(opt.current_lr))
                     utils.set_lr(optimizer, opt.current_lr)  # set the decayed rate
                 # Assign the scheduled sampling prob
@@ -209,7 +241,6 @@ def train(opt):
             print("{}th Epoch Training starts now!".format(epoch))
             with tqdm(total=len(loader.split_ix['train']), initial=start_Img_idx) as pbar:
                 for i in range(start_Img_idx, len(loader.split_ix['train']), opt.batch_size):
-                    # import ipdb; ipdb.set_trace()
                     start = time.time()
                     if (opt.use_warmup == 1) and (iteration < opt.noamopt_warmup):
                         opt.current_lr = opt.learning_rate * (iteration + 1) / opt.noamopt_warmup
@@ -223,18 +254,9 @@ def train(opt):
 
                     torch.cuda.synchronize()
                     start = time.time()
-                    tmp = [data['fc_feats'], data['att_feats'], data['flag_feats'], data['labels'], data['masks'],
-                           data['att_masks']]
+                    tmp = [data['fc_feats'], data['att_feats'], data['flag_feats'], data['labels'], data['masks'], data['att_masks']]
                     tmp = [_ if _ is None else _.cuda() for _ in tmp]
                     fc_feats, att_feats, flag_feats, labels, masks, att_masks = tmp
-                    # import ipdb
-                    # ipdb.set_trace()
-                    # print(fc_feats.shape)
-                    # print(att_feats.shape)
-                    # print(flag_feats.shape)
-                    # print(flag_feats[0])
-                    # print(masks.shape)
-                    # print(att_masks.shape)
 
                     model_out = dp_lw_model(fc_feats, att_feats, flag_feats, labels, masks, att_masks, data['gts'],
                                             torch.arange(0, len(data['gts'])), sc_flag)
@@ -263,10 +285,14 @@ def train(opt):
                         epoch += 1
                         epoch_done = True
                         # save after each epoch
-                        save_checkpoint(model, infos, optimizer, append=str(epoch))
+                        save_checkpoint(model, infos, optimizer)
+                        if epoch > 15:  # To save memory, you can comment this part
+                            save_checkpoint(model, infos, optimizer, append=str(epoch))
+                        print("=====================================================")
+                        print("======Best Cider = {} in epoch {}: iter {}!======".format(best_val_score, best_epoch, infos.get('best_itr', None)))
+                        print("=====================================================")
 
-
-                    # Write validation result into summary
+                    # Write training history into summary
                     if (iteration % opt.losses_log_every == 0) and opt.write_summary:
                         # if (iteration % 10== 0) and opt.write_summary:
                         add_summary_value(tb_summary_writer, 'loss/train_loss', train_loss, iteration)
@@ -291,12 +317,17 @@ def train(opt):
                     infos['split_ix'] = loader.split_ix
 
                     # make evaluation on validation set, and save model
-                    # TODO modify it to evaluate by each epoch
-                    # ipdb.set_trace()
-                    if (iteration % opt.save_checkpoint_every == 0) and eval_:
+                    # unnecessary to eval from the beginning 
+                    if (iteration % opt.save_checkpoint_every == 0) and eval_ and epoch > 3:
                         # eval model
                         model_path = os.path.join(opt.checkpoint_path, 'model_itr%s.pth' % (iteration))
-                        eval_kwargs = {'split': 'val',
+                        if opt.use_val and not opt.use_test:
+                            val_split = 'test'
+                        if not opt.use_val:
+                            val_split = 'val'
+                        # val_split = 'val'
+
+                        eval_kwargs = {'split': val_split,
                                        'dataset': opt.input_json,
                                        'model': model_path}
                         eval_kwargs.update(vars(opt))
@@ -337,6 +368,8 @@ def train(opt):
 
                         if best_val_score is None or current_score > best_val_score:
                             best_val_score = current_score
+                            infos['best_epoch'] = epoch
+                            infos['best_itr'] = iteration
                             best_flag = True
 
                         # Dump miscalleous informations
@@ -351,17 +384,18 @@ def train(opt):
                             save_checkpoint(model, infos, optimizer, append=str(iteration))
 
                         if best_flag:
+                            best_epoch = epoch
                             save_checkpoint(model, infos, optimizer, append='best')
                             print("update best model at {} iteration--{} epoch".format(iteration, epoch))
-
+                    # reset
                     start_Img_idx = 0
-                    # if epoch_done: # go through the set, start a new epoch loop
-                    #     break
             # Stop if reaching max epochs
             if epoch >= opt.max_epochs and opt.max_epochs != -1:
                 print("epoch {} break all".format(epoch))
                 save_checkpoint(model, infos, optimizer)
+                # save_checkpoint(model, infos, optimizer, append=str(epoch))
                 tb_summary_writer.close()
+                print("============{} Training Done !==============".format('Refine' if opt.use_test or opt.use_val else ''))
                 break
     except (RuntimeError, KeyboardInterrupt):  # KeyboardInterrupt
         print('Save ckpt on exception ...')
@@ -372,9 +406,5 @@ def train(opt):
 
 
 opt = opts.parse_opt()
-# opt.name_append='24'
-if len(opt.name_append) > 0 and opt.name_append[0] != '-':
-    opt.name_append = '_' + opt.name_append
-# opt.start_from='log/tmp/train_erebos4/log_aoanet_rl'
 print("========================start from {}.".format(opt.start_from))
 train(opt)

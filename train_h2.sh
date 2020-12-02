@@ -15,7 +15,7 @@ fi
 # echo $word_count_threshold
 # echo $start_from
 # CUDA_VISIBLE_DEVICES=$GPU_id
-# python train_h2.py --id $id --refine_aoa $refine_aoa --caption_model $caption_model --aoa_num $aoa_num\
+# python train_h.py --id $id --refine_aoa $refine_aoa --caption_model $caption_model --aoa_num $aoa_num\
 # 	--caption_model $caption_model \
 # 	--refine 1 \
 # 	--refine_aoa $refine_aoa \
@@ -56,7 +56,7 @@ fi
 # 	--learning_rate_decay_every 3 \
 # 	--use_warmup 0
 
-python train_h2.py --id $id --refine_aoa $refine_aoa --caption_model $caption_model --aoa_num $aoa_num\
+python train_h.py --id $id --refine_aoa $refine_aoa --caption_model $caption_model --aoa_num $aoa_num\
 	--caption_model $caption_model \
 	--refine 1 \
 	--refine_aoa $refine_aoa \
