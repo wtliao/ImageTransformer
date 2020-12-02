@@ -7,17 +7,12 @@ import glob
 def compute_iou(bbox):
     N = bbox.shape[0]
     flag = np.zeros((N, N)) + 2
-    # np.fill_diagonal(iou,0)
     width = bbox[:, 2] - bbox[:, 0]
     ht = bbox[:, 3] - bbox[:, 1]
     area = width * ht
     for i in range(N):
         temp = bbox[i, :]
         t_left, t_right, t_top, t_bot = temp[0], temp[2], temp[1], temp[3]
-        # x_left = np.zeros(N)
-        # x_right = np.zeros(N)
-        # x_top = np.zeros(N)
-        # x_bot = np.zeros(N)
         for j in range(N):
 
             x_left = max(t_left, bbox[j, 0])
@@ -57,33 +52,14 @@ def compute_iou(bbox):
 #             if flag[i,j] ==1:
 #                 assert flag[j,i]==3, "if A is P of B, B muss be C of A"
 
-
-# coco = json.load(open('/home/liao/work_code/AoANet/data/tmp/4/cocotalk.json'))
-# print(coco.keys())
-# im_info = coco['images']
-
-
 # get adjacent matrix of challening data
-files = glob.glob('./data/adaptive/test2014/cocobu_box/*.npy')
-
-# for i in range(len(im_info)):
-#     print(i)
-
-#     temp = im_info[i]
-#     bbid = str(temp['id'])
-#     bb = np.load('/home/liao/work_code/AoANet/data/adaptive/test2015/cocobu_box/' + bbid + '.npy')
+# files = glob.glob('./data/adaptive/test2014/cocobu_box/*.npy')
+# files = glob.glob('./data/adaptive/test2015/cocobu_box/*.npy')
+files = glob.glob('./data/adaptive/cocobu_box/*.npy')
 for i, f in enumerate(files):
     bb = np.load(f)
     flag = compute_iou(bb)
-    np.save('/home/liao/work_code/AoANet/data/tmp/cocobu_flag_h_v1_challenging14/' + os.path.basename(f), flag)
-    if i % 5000 == 0:
-        print("{}/{}".format(i, len(files)))
-
-
-files = glob.glob('./data/adaptive/test2015/cocobu_box/*.npy')
-for i, f in enumerate(files):
-    bb = np.load(f)
-    flag = compute_iou(bb)
-    np.save('/home/liao/work_code/AoANet/data/tmp/cocobu_flag_h_v1_challenging15/' + os.path.basename(f), flag)
+    # change the path where you would like to save the flag information
+    np.save('/home/liao/work_code/AoANet/data/tmp/cocobu_flag/' + os.path.basename(f), flag) 
     if i % 5000 == 0:
         print("{}/{}".format(i, len(files)))
