@@ -12,8 +12,7 @@ import time
 import os
 from six.moves import cPickle
 import traceback
-import pdb
-import opts1 as opts
+import opts as opts
 import models
 from dataloader1 import *
 import skimage.io
@@ -22,6 +21,7 @@ import misc.utils as utils
 from misc.rewards import init_scorer, get_self_critical_reward
 from misc.loss_wrapper1 import LossWrapper1
 from tqdm import tqdm
+import pdb
 
 try:
     import tensorboardX as tb

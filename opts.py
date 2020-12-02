@@ -3,9 +3,17 @@ import argparse
 
 def parse_opt():
     parser = argparse.ArgumentParser()
+    # Use all train val data to fine tune model for challenge, we dont use it. Just set it for convenient
+    parser.add_argument('--use_val', type=int, default=0,
+                        help='add the val set for training if True')
+    parser.add_argument('--use_test', type=int, default=0,
+                        help='add the test set for training if True')
+    parser.add_argument('--test_online', type=int, default=0,
+                        help='whether test on the coco2014 test dataset for online evaluation')
+    parser.add_argument('--refine_lr_decay', type=float, default=1,
+                        help='reduce lr to for refining')
+
     # Data input settings
-    # parser.add_argument('--word_count_threshold', type=int, default=4,
-    #                     help='difference in vocabulary.')
     parser.add_argument('--input_json', type=str, default='data/tmp/4/cocotalk.json',
                         help='path to the json file containing additional info and vocab')
     parser.add_argument('--input_fc_dir', type=str, default='data/adaptive/cocobu_fc',
@@ -14,7 +22,13 @@ def parse_opt():
                         help='path to the directory containing the preprocessed att feats')
     parser.add_argument('--input_box_dir', type=str, default='data/adaptive/cocobu_box',
                         help='path to the directory containing the boxes of att feats')
-
+    # add flag dir
+    parser.add_argument('--input_flag_dir', type=str, default='data/tmp/cocobu_flag_h_v1',
+                        help="""path to the directory containing the boxes of att feats
+                        cocobu_flag_h: with hierarchical information
+                        cocobu_flag_wh: w/o hierarchical information
+                        """)
+    ###
     parser.add_argument('--input_label_h5', type=str, default='data/tmp/4/cocotalk_label.h5',
                         help='path to the h5file containing the preprocessed dataset')
     parser.add_argument('--name_append', type=str, default='',
@@ -31,7 +45,7 @@ def parse_opt():
                         help='Cached token file for calculating cider score during self critical training.')
 
     # Model settings
-    parser.add_argument('--caption_model', type=str, default="transformer",
+    parser.add_argument('--caption_model', type=str, default="",
                         help='show_tell, show_attend_tell, all_img, fc, att2in, att2in2, att2all2, adaatt, adaattmo, topdown, stackatt, denseatt, transformer')
     parser.add_argument('--rnn_size', type=int, default=1024,
                         help='size of the rnn in number of hidden nodes in each layer')
@@ -63,9 +77,11 @@ def parse_opt():
     parser.add_argument('--refine_aoa', type=int, default=1,
                         help='use aoa in the refining module?')
     parser.add_argument('--use_ff', type=int, default=0,
-                        help='keep feed-forward layer in the refining module?') # Note what is feed-forward layer
+                        help='keep feed-forward layer in the refining module?')
     parser.add_argument('--dropout_aoa', type=float, default=0.3,
                         help='dropout_aoa in the refining module?')
+    parser.add_argument('--aoa_num', type=int, default=6,
+                        help='How many aoa modules are used in encoder?') 
 
     parser.add_argument('--ctx_drop', type=int, default=1,
                         help='apply dropout to the context vector before fed into LSTM?')
@@ -94,7 +110,7 @@ def parse_opt():
     # Optimization: General
     parser.add_argument('--max_epochs', type=int, default=25,
                         help='number of epochs')
-    parser.add_argument('--batch_size', type=int, default=4,
+    parser.add_argument('--batch_size', type=int, default=50,
                         help='minibatch size')
     parser.add_argument('--grad_clip', type=float, default=0.1, #5.,
                         help='clip gradients at this value')
@@ -160,11 +176,11 @@ def parse_opt():
     # Evaluation/Checkpointing
     parser.add_argument('--val_images_use', type=int, default=-1,
                         help='how many images to use when periodically evaluating the validation loss? (-1 = all)')
-    parser.add_argument('--save_checkpoint_every', type=int, default=6000,
+    parser.add_argument('--save_checkpoint_every', type=int, default=10000,
                         help='how often to save a model checkpoint (in iterations)?')
     parser.add_argument('--save_history_ckpt', type=int, default=0,
                         help='If save checkpoints at every save point')
-    parser.add_argument('--checkpoint_path', type=str, default='log/tmp/save/log_aoanet',
+    parser.add_argument('--checkpoint_path', type=str, default='log/tmp/h/log_aoanet',
                         help='directory to store checkpointed models')
     parser.add_argument('--language_eval', type=int, default=1,
                         help='Evaluate language as well (1 = yes, 0 = no)? BLEU/CIDEr/METEOR/ROUGE_L? requires coco-caption code from Github.')
@@ -174,10 +190,11 @@ def parse_opt():
                         help='Do we load previous best score when resuming training.')
 
     # misc
-    parser.add_argument('--id', type=str, default='aoanet',
+    parser.add_argument('--id', type=str, default='h',
                         help='an id identifying this run/job. used in cross-val and appended when writing progress files')
     parser.add_argument('--train_only', type=int, default=0,
                         help='if true then use 80k, else use 110k')
+    
 
     # Reward
     parser.add_argument('--cider_reward_weight', type=float, default=1,
@@ -210,8 +227,9 @@ def add_eval_options(parser):
                         help='if > 0 then overrule, otherwise load from checkpoint.')
     parser.add_argument('--num_images', type=int, default=-1,
                         help='how many images to use when periodically evaluating the loss? (-1 = all)')
-    parser.add_argument('--language_eval', type=int, default=0,
-                        help='Evaluate language as well (1 = yes, 0 = no)? BLEU/CIDEr/METEOR/ROUGE_L? requires coco-caption code from Github.')
+    parser.add_argument('--language_eval', type=int, default=1,
+                        help='Evaluate language as well (1 = yes, 0 = no)? BLEU/CIDEr/METEOR/ROUGE_L? requires '
+                             'coco-caption code from Github.')
     parser.add_argument('--dump_images', type=int, default=0,
                         help='Dump images into vis/imgs folder for vis? (1=yes,0=no)')
     parser.add_argument('--dump_json', type=int, default=1,
@@ -252,14 +270,19 @@ def add_eval_options(parser):
                         help='path to the h5file containing the preprocessed dataset')
     parser.add_argument('--input_box_dir', type=str, default='data/adaptive/cocobu_box',
                         help='path to the h5file containing the preprocessed dataset')
+    ##add flag dir
+    parser.add_argument('--input_flag_dir', type=str, default='data/tmp/cocobu_flag_h',
+                        help="""path to the directory containing the boxes of att feats
+                        cocobu_flag_h: with hierarchical information
+                        cocobu_flag_wh: w/o hierarchical information
+                        """)
     parser.add_argument('--input_label_h5', type=str, default='data/tmp/4/cocotalk_label.h5',
                         help='path to the h5file containing the preprocessed dataset')
-    parser.add_argument('--input_json', type=str, default='data/tmp/4/cocotalk.json', 
+    parser.add_argument('--input_json', type=str, default='data/tmp/4/cocotalk.json',
                         help='path to the json file containing additional info and vocab. empty = fetch from model checkpoint.')
     parser.add_argument('--split', type=str, default='test',
                         help='if running on MSCOCO images, which split to use: val|test|train')
-    parser.add_argument('--coco_json', type=str, default='',
-                        help='if nonempty then use this file in DataLoaderRaw (see docs there). Used only in MSCOCO test evaluation, where we have a specific json file of only test set images.')
+
     # misc
     parser.add_argument('--id', type=str, default='',
                         help='an id identifying this run/job. used only if language_eval = 1 for appending to intermediate files')

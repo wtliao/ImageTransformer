@@ -12,9 +12,8 @@ import time
 import os
 from six.moves import cPickle
 import traceback
-import opts1 as opts
+import opts as opts
 import models
-# from dataloader_relative import *
 from dataloader1 import *
 import skimage.io
 import eval_utils_h as eval_utils
@@ -22,12 +21,14 @@ import misc.utils2 as utils
 from misc.rewards import init_scorer, get_self_critical_reward
 from misc.loss_wrapper1 import LossWrapper1
 from tqdm import tqdm
+import pdb
 
 try:
     import tensorboardX as tb
 except ImportError:
     print("tensorboardX is not installed")
     tb = None
+
 # set the maximum number of CPU kernel
 torch.set_num_threads(10)
 
@@ -70,7 +71,7 @@ def train(opt):
     if torch.cuda.device_count() > 1:
         checkpoint_path_suffix += "_gpu{}".format(torch.cuda.device_count())
 
-    if opt.checkpoint_path[-3:] == '_rl':
+    if opt.checkpoint_path.endswith('_rl'):
         opt.checkpoint_path = opt.checkpoint_path[:-3] + checkpoint_path_suffix + '_rl'
     else:
         opt.checkpoint_path += checkpoint_path_suffix
@@ -419,15 +420,5 @@ def train(opt):
 
 
 opt = opts.parse_opt()
-# opt.name_append='24'
-# if len(opt.name_append) > 0 and opt.name_append[0] != '-':
-#     opt.name_append = '_' + opt.name_append
-# opt.start_from='log/tmp/train_erebos4/log_aoanet_rl'
 print("========================start from {}.".format(opt.start_from))
-# if opt.caption_model is 'aoarelative':
-#     from dataloader_relative import *
-# elif opt.caption_model in ['aoa3', 'aoa4']:
-#     from dataloader1 import *
-# else:
-#     from dataloader import *
 train(opt)
