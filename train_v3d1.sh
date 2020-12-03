@@ -46,7 +46,7 @@ python train_h.py --id $id --refine_aoa $refine_aoa --caption_model $caption_mod
 	--learning_rate_decay_start 0 \
 	--scheduled_sampling_start 0 \
 	--name_append ""\
-	--checkpoint_path log/tmp/train_ours/log_refine_aoa_${id}_aoa${aoa_num}_numlayer3  \
+	--checkpoint_path log/tmp/train_ours/log_refine_aoa_${id}_aoa${aoa_num}  \
 	$start_from \
 	--save_checkpoint_every 5000 \
 	--language_eval 1 \
@@ -87,7 +87,7 @@ python train_h.py --id $id --refine_aoa $refine_aoa --caption_model $caption_mod
 	 --val_images_use -1 \
 	 --save_checkpoint_every 5000 \
 	 --name_append ""\
-	 --start_from log/tmp/train_ours/log_refine_aoa_${id}_aoa${aoa_num}_numlayer3_bs10_warmup\
+	 --start_from log/tmp/train_ours/log_refine_aoa_${id}_aoa${aoa_num}\
 	 --checkpoint_path log/tmp/train_ours/log_refine_aoa_${id}_aoa${aoa_num}_rl \
 	 --learning_rate 2e-5 \
 	 --max_epochs 60 \

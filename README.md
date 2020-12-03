@@ -14,7 +14,7 @@ This repo is not completely.
 - tensorboardX
 
 ## TODO
-- [ ] instruction to prepare dataset
+- [x] instruction to prepare dataset
 - [ ] remove all unnecessary files
 - [ ] add link to downlown our pretrained model
 - [ ] clean code including comments
@@ -23,9 +23,9 @@ This repo is not completely.
 
 ### Prepare data
 
-See details in `data/README.md`.
-
-You should also preprocess the dataset and get the cache for calculating cider score for [SCST](https://arxiv.org/abs/1612.00563):
+1. We used the preprocessed data from the work [bottom-up-attention](https://github.com/peteanderson80/bottom-up-attention). The adaptive ones are used in our work. Please refer to their repo for more information.
+2. prepare the hierarchy information (denoted as flag in the code) by running `compute_nb_h.py`. Please modify the file path in Line 58 and the save path in Line 63.
+3. You should also preprocess the dataset and get the cache for calculating cider score for [SCST](https://arxiv.org/abs/1612.00563):
 
 ```bash
 $ python scripts/prepro_ngrams.py --input_json data/dataset_coco.json --dict_json data/cocotalk.json --output_pkl data/coco-train --split train
@@ -33,7 +33,7 @@ $ python scripts/prepro_ngrams.py --input_json data/dataset_coco.json --dict_jso
 ### Start training
 
 ```bash
-$ CUDA_VISIBLE_DEVICES=0 sh train.sh
+$ CUDA_VISIBLE_DEVICES=0 sh train_v3d1.sh
 ```
 
 See `opts.py` for the options. (You can download the pretrained models from [here]()
@@ -47,8 +47,6 @@ $ CUDA_VISIBLE_DEVICES=0 python eval.py --model log/log_aoanet_rl/model.pth --in
 
 ### Performance
 You will get the scores close to below after training under xe loss for 25 epochs:
-
-
 
 ## Reference
 
@@ -65,4 +63,4 @@ If you find this repo helpful, please consider citing:
 
 ## Acknowledgements
 
-This repository is based on [self-critical.pytorch](https://github.com/ruotianluo/self-critical.pytorch),  and [AoAnet](https://github.com/husthuaan/AoANet)and you may refer to it for more details about the code.
+This repository is based on [self-critical.pytorch](https://github.com/ruotianluo/self-critical.pytorch),  and heavily borrow from [AoAnet](https://github.com/husthuaan/AoANet). You may refer to it for more details about the code.
