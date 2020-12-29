@@ -121,3 +121,4 @@ log/
 slurmtask.sh
 slurmtask2.sh
 compute_nb.py
+testslurm.sh

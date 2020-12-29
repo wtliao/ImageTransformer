@@ -86,8 +86,6 @@ def language_eval(dataset, preds, model_id, split):
 
 
 def eval_split(model, crit, loader, eval_kwargs={}):
-    # import ipdb; ipdb.set_trace()
-    # print caption
     verbose = eval_kwargs.get('verbose', True)
     verbose = False
     # Print beam search
@@ -114,11 +112,9 @@ def eval_split(model, crit, loader, eval_kwargs={}):
     predictions = []
     st1 = time.time()
 
-    # with tqdm(total=len(loader.split_ix[split])) as pbar:
     while True:
         data = loader.get_batch(split)
         n = n + loader.batch_size
-        # pbar.update(loader.batch_size)
         if data.get('labels', None) is not None and verbose_loss:
             # forward the model to get loss
             tmp = [data['fc_feats'], data['att_feats'], data['flag_feats'], data['labels'], data['masks'],
