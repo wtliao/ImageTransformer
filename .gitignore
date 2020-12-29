@@ -118,3 +118,6 @@ log/
 *.h5
 *.tar
 
+slurmtask.sh
+slurmtask2.sh
+compute_nb.py

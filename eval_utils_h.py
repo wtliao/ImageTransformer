@@ -41,14 +41,13 @@ def language_eval(dataset, preds, model_id, split):
 
     # encoder.FLOAT_REPR = lambda o: format(o, '.3f')
 
-    if not os.path.isdir('eval_results'):
-        os.mkdir('eval_results')
-
     if '+' in model_id:  # ensemble
         save_to = 'eval_results/ensemble'
     else:
         save_to = 'eval_results/single'
 
+    if not os.path.isdir(save_to):
+        os.mkdir(save_to)
     cache_path = os.path.join(save_to, model_id + '_' + split + '.json')
     # cache_path = os.path.join(save_to, 'tmp_' + split + '.json')
     coco = COCO(annFile)
@@ -115,8 +114,8 @@ def eval_split(model, crit, loader, eval_kwargs={}):
     predictions = []
     st1 = time.time()
 
-    # with tqdm(total=len(loader.split_ix[split])) as pbar:
-    while True:
+    with tqdm(total=len(loader.split_ix[split])) as pbar:
+    # while True:
         data = loader.get_batch(split)
         n = n + loader.batch_size
         # pbar.update(loader.batch_size)
@@ -179,11 +178,11 @@ def eval_split(model, crit, loader, eval_kwargs={}):
         if verbose:
             print('evaluating validation preformance... %d/%d (%f)' % (ix0 - 1, ix1, loss))
 
-        if data['bounds']['wrapped']:
-            break
+        # if data['bounds']['wrapped']:
+        #     break
 
-        if num_images >= 0 and n >= num_images:
-            break
+        # if num_images >= 0 and n >= num_images:
+        #     break
 
     lang_stats = None
     if lang_eval == 1:

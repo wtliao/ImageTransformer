@@ -13,11 +13,18 @@ This repo is not completely.
 - coco-caption (already been added as a submodule)
 - tensorboardX
 
+Or install full requirements by running:
+```bash
+pip install -r requirements.txt
+```
+
 ## TODO
 - [x] instruction to prepare dataset
 - [ ] remove all unnecessary files
-- [ ] add link to downlown our pretrained model
+- [ ] add link to download our pre-trained model
 - [ ] clean code including comments
+- [ ] instruction for training
+- [ ] instruction for evaluation
 
 ## Training ImageTransformer
 
