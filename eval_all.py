@@ -15,7 +15,7 @@ import opts1
 # from dataloader import *
 from dataloader import *
 # import misc.utils as utils
-import misc.utils2 as utils
+import misc.utils as utils
 from dataloaderraw import *
 # import eval_utils
 import eval_utils_h as eval_utils

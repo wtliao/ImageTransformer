@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import misc.utils2 as utils
+import misc.utils as utils
 from misc.rewards import init_scorer, get_self_critical_reward
 
 class LossWrapper1(nn.Module):

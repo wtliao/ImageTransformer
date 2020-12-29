@@ -17,7 +17,7 @@ from dataloaderraw import *
 import eval_utils_h as eval_utils
 from eval_online import eval_online
 import argparse
-import misc.utils2 as utils
+import misc.utils as utils
 import torch
 
 # Input arguments and options

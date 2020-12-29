@@ -6,7 +6,7 @@ import os
 import copy
 
 import numpy as np
-import misc.utils2 as utils
+import misc.utils as utils
 import torch
 import pdb
 from .ShowTellModel import ShowTellModel

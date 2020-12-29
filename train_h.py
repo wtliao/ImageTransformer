@@ -17,7 +17,7 @@ import models
 from dataloader import *
 import skimage.io
 import eval_utils_h as eval_utils
-import misc.utils2 as utils
+import misc.utils as utils
 from misc.rewards import init_scorer, get_self_critical_reward
 from misc.loss_wrapper1 import LossWrapper1
 from tqdm import tqdm
