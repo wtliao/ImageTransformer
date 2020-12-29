@@ -21,7 +21,7 @@ pip install -r requirements.txt
 ## TODO
 - [x] instruction to prepare dataset
 - [ ] remove all unnecessary files
-- [ ] add link to download our pre-trained model
+- [x] add link to download our pre-trained model
 - [ ] clean code including comments
 - [ ] instruction for training
 - [ ] instruction for evaluation
@@ -52,8 +52,19 @@ See `opts.py` for the options. (You can download the pretrained models from [her
 $ CUDA_VISIBLE_DEVICES=0 python eval.py --model log/log_aoanet_rl/model.pth --infos_path log/log_aoanet_rl/infos_aoanet.pkl  --dump_images 0 --dump_json 1 --num_images -1 --language_eval 1 --beam_size 2 --batch_size 100 --split test
 ```
 
+### Trained model
+you can download our trained model from our [onedrive repo](https://1drv.ms/u/s!At2RxWvE6z1zgrcPoGuu_iiT2I9D0g?e=Ah9PUG)
+
 ### Performance
-You will get the scores close to below after training under xe loss for 25 epochs:
+You will get the scores close to below after training under xe loss for 37 epochs:
+```python
+{'Bleu_1': 0.776, 'Bleu_2': 0.619, 'Bleu_3': 0.484, 'Bleu_4': 0.378, 'METEOR': 0.285, 'ROUGE_L': 0.575, 'CIDEr': 1.91, 'SPICE': 0.215}
+```
+(**notes:** You can enlarge `--max_epochs` in `train.sh` to train the model for more epochs and improve the scores.)
+
+after training under SCST loss for another 15 epochs, you will get:
+```python
+{'Bleu_1': 0.807, 'Bleu_2': 0.653, 'Bleu_3': 0.510, 'Bleu_4': 0.392, 'METEOR': 0.291, 'ROUGE_L': 0.590, 'CIDEr': 1.308, 'SPICE': 0.228}
 
 ## Reference
 

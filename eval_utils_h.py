@@ -13,7 +13,7 @@ import string
 import time
 import os
 import sys
-import misc.utils as utils
+import misc.utils2 as utils
 import ipdb
 from tqdm import tqdm
 
@@ -114,8 +114,8 @@ def eval_split(model, crit, loader, eval_kwargs={}):
     predictions = []
     st1 = time.time()
 
-    with tqdm(total=len(loader.split_ix[split])) as pbar:
-    # while True:
+    # with tqdm(total=len(loader.split_ix[split])) as pbar:
+    while True:
         data = loader.get_batch(split)
         n = n + loader.batch_size
         # pbar.update(loader.batch_size)
@@ -178,11 +178,11 @@ def eval_split(model, crit, loader, eval_kwargs={}):
         if verbose:
             print('evaluating validation preformance... %d/%d (%f)' % (ix0 - 1, ix1, loss))
 
-        # if data['bounds']['wrapped']:
-        #     break
-
-        # if num_images >= 0 and n >= num_images:
-        #     break
+        if data['bounds']['wrapped']:
+            break
+        print(n)
+        if num_images >= 0 and n >= num_images:
+            break
 
     lang_stats = None
     if lang_eval == 1:

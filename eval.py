@@ -19,7 +19,7 @@ import misc.utils2 as utils
 import eval_utils_h as eval_utils
 # import eval_utils
 from eval_online import eval_online
-# from dataloaderraw import *
+from dataloaderraw import *
 import argparse
 import torch
 try:
@@ -60,7 +60,7 @@ opt = parser.parse_args()
 # opt.num_images = 1
 opt.language_eval = 1
 opt.beam_size = 3
-opt.batch_size = 100
+opt.batch_size = 500
 opt.split = 'test'
 opt.test_online = 0
 opt.use_val = getattr(opt, 'use_val', 0)
@@ -73,13 +73,11 @@ val_and_test = 0
 
 aoa_id = '3d1'
 aoa_num = 3
-append_info = '_new2'
+append_info = '_new10_new1_37_rl'
 opt.caption_model = 'aoa' + aoa_id
 opt.id = 'h_v' + aoa_id
-# opt.caption_model = 'transformer'
-# opt.id = 'transformer'
 opt.input_flag_dir = 'data/tmp/cocobu_flag_h_v1'
-model_ids = ['35']#+list(range(70, 81))
+model_ids = ['best_720000']#+list(range(70, 81))
 best_cider = -1
 best_epoch = -1
 write_summary = False
@@ -98,8 +96,6 @@ else:
 for model_id in model_ids:
     opt.model = 'log/tmp/train_ours/log_refine_aoa_{}_aoa{}{}/model_{}.pth'.format(opt.id, aoa_num, append_info, model_id)
     opt.infos_path = 'log/tmp/train_ours/log_refine_aoa_{}_aoa{}{}/infos_{}.pkl'.format(opt.id, aoa_num, append_info, model_id)
-    # opt.model = 'log/tmp/train_ours/log_refine_{}/model_{}.pth'.format(opt.id, model_id)
-    # opt.infos_path = 'log/tmp/train_ours/log_refine_{}/infos_{}.pkl'.format(opt.id, model_id)
     test_result = {}
 
     # Load infos
