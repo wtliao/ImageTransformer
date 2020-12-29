@@ -62,10 +62,10 @@ You will get the scores close to below after training under xe loss for 37 epoch
 ```
 (**notes:** You can enlarge `--max_epochs` in `train.sh` to train the model for more epochs and improve the scores.)
 
-after training under SCST loss for another 15 epochs, you will get:
+after training under SCST loss for another 26 epochs, you will get:
 ```python
 {'Bleu_1': 0.807, 'Bleu_2': 0.653, 'Bleu_3': 0.510, 'Bleu_4': 0.392, 'METEOR': 0.291, 'ROUGE_L': 0.590, 'CIDEr': 1.308, 'SPICE': 0.228}
-
+```
 ## Reference
 
 If you find this repo helpful, please consider citing:
