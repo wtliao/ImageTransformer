@@ -14,7 +14,7 @@ import models
 import opts
 # from dataloader_relative import *
 from dataloader import *
-import misc.utils as utils
+import misc.utils2 as utils
 # import misc.utils as utils
 import eval_utils_h as eval_utils
 # import eval_utils
@@ -79,7 +79,7 @@ opt.id = 'h_v' + aoa_id
 # opt.caption_model = 'transformer'
 # opt.id = 'transformer'
 opt.input_flag_dir = 'data/tmp/cocobu_flag_h_v1'
-model_ids = ['best']#+list(range(70, 81))
+model_ids = ['35']#+list(range(70, 81))
 best_cider = -1
 best_epoch = -1
 write_summary = False
